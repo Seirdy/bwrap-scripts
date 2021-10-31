@@ -1,0 +1,2 @@
+@include seccomp-allowed-drm
+ptrace

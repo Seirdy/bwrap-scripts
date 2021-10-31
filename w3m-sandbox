@@ -1,0 +1,80 @@
+#!/usr/bin/env dash
+progname="$(basename "${0}")"
+
+help_text="Usage: $progname [OPTION...] [FILE]
+
+View a file or STDIN in w3m, sandboxed with bubblewrap.
+Internet access is blocked; ideal for viewing HTML emails.
+
+Options:
+  -h, --help            Print this help and exit
+"
+
+usage() {
+	printf '%s' "$help_text"
+}
+
+# when the user passess bad args, send a msg to stderr and exit
+# usage: bad_option <option> <reason>
+bad_option() {
+	echo "$progname: option $1: $2" >&2
+	usage >&2
+	exit 1
+}
+
+args=''
+
+# parse arguments
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h | --help)
+			usage
+			exit 0
+			;;
+		-*)
+			args="$args $1"
+			;;
+		*)
+			if [ -f "$1" ]; then
+				file_path="$1"
+			else
+				args="$args $1"
+			fi
+			;;
+	esac
+	shift
+done
+
+if [ -n "$TERMINFO" ]; then
+	terminfo="$TERMINFO"
+else
+	terminfo="/usr/share/terminfo"
+fi
+
+xdg_data="${XDG_DATA_HOME-$HOME/.local/share}"
+
+bwrap_wrapper() {
+	env -i bwrap \
+		--ro-bind /usr/bin/w3m /usr/bin/w3m \
+		--ro-bind "$terminfo" /usr/share/terminfo \
+		--ro-bind "$HOME/.w3m" "$HOME/.w3m" \
+		--symlink usr/lib64 /lib64 \
+		--ro-bind /usr/lib64 /usr/lib64 \
+		--proc /proc \
+		--unshare-all \
+		--hostname RESTRICTED \
+		--setenv WWW_HOME "$HOME/.w3m" \
+		--setenv TERM "$TERM" \
+		--new-session --die-with-parent --cap-drop ALL \
+		--seccomp 9 \
+		"$@" 9<"$xdg_data/seccomp/seccomp-filter-w3m.bpf"
+
+}
+
+if [ -z "$file_path" ]; then
+	bwrap_wrapper w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args
+else
+	bwrap_wrapper --ro-bind "$(dirname "$file_path")" /data w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args "/data/$(basename "$file_path")"
+fi
+
+# vi:ft=sh

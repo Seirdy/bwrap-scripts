@@ -1,0 +1,47 @@
+#!/usr/bin/env dash
+# A helpful comment
+
+if [ -n "$TERMINFO" ]; then
+	terminfo="$TERMINFO"
+else
+	terminfo="/usr/share/terminfo"
+fi
+
+xdg_data="${XDG_DATA_HOME-$HOME/.local/share}"
+
+hnterm_path="$(command -v hnterm)"
+
+bwrap_wrapper() {
+	env -i bwrap \
+		--ro-bind "$terminfo" /usr/share/terminfo \
+		--ro-bind "$hnterm_path" /bin/hnterm \
+		--symlink /usr/lib64 /lib64 \
+		--ro-bind /usr/lib64 /usr/lib64 \
+		--ro-bind /usr/lib /usr/lib \
+		--symlink /usr/lib /lib \
+		--bind /run /run \
+		--ro-bind /etc/alternatives /etc/alternatives \
+		--ro-bind /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf \
+		--ro-bind /usr/share/pki /usr/share/pki \
+		--ro-bind /etc /etc \
+		--ro-bind /usr/share/crypto-policies /usr/share/crypto-policies \
+		--ro-bind /usr/share/p11-kit /usr/share/p11-kit \
+		--proc /proc \
+		--unshare-all --share-net \
+		--hostname RESTRICTED \
+		--setenv TERM "$TERM" \
+		--new-session --die-with-parent --cap-drop ALL \
+		--seccomp 9 \
+		"$@" 9<"$xdg_data/seccomp/seccomp-filter-default.bpf"
+
+}
+
+bwrap_wrapper /bin/hnterm
+
+# if [ -z "$file_path" ]; then
+# 	bwrap_wrapper w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args
+# else
+# 	bwrap_wrapper --ro-bind "$(dirname "$file_path")" /data w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args "/data/$(basename "$file_path")"
+# fi
+
+# vi:ft=sh

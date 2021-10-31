@@ -1,0 +1,71 @@
+#!/usr/bin/env dash
+
+set -eu
+
+mkdir -p "$HOME/Downloads/firefox"
+
+xdg_cache="${XDG_CACHE_HOME-$HOME/.cache}"
+xdg_data="${XDG_DATA_HOME-$HOME/.local/share}"
+xdg_runtime="${XDG_RUNTIME_DIR-/run/user/$(id -u)}"
+
+# unset all envvars with "env -i"
+# mime, icons, and glib need to be shared for save dialogs to work
+# xcb needs to be shared when launching after an update
+# /tmp/.X11-unix access allows isolating network namespace
+env -i bwrap \
+	--symlink usr/lib /lib \
+	--symlink usr/lib64 /lib64 \
+	--ro-bind /tmp/.X11-unix /tmp/.X11-unix \
+	--ro-bind /usr/lib /usr/lib \
+	--ro-bind /usr/lib64 /usr/lib64 \
+	--ro-bind /usr/share/X11/xkb /usr/share/X11/xkb \
+	--ro-bind /usr/share/themes /usr/share/themes \
+	--ro-bind /usr/share/icons /usr/share/icons \
+	--ro-bind /usr/share/locale /usr/share/locale \
+	--ro-bind /usr/share/mime /usr/share/mime \
+	--ro-bind /usr/share/libdrm /usr/share/libdrm \
+	--ro-bind /usr/share/glvnd /usr/share/glvnd \
+	--ro-bind /usr/share/fonts /usr/share/fonts \
+	--ro-bind /usr/share/fontconfig /usr/share/fontconfig \
+	--ro-bind /usr/share/pki /usr/share/pki \
+	--ro-bind /usr/share/crypto-policies /usr/share/crypto-policies \
+	--ro-bind /usr/share/p11-kit /usr/share/p11-kit \
+	--ro-bind /usr/share/applications /usr/share/applications \
+	--ro-bind /usr/share/glib-2.0 /usr/share/glib-2.0 \
+	--ro-bind /etc/alternatives /etc/alternatives \
+	--ro-bind /etc/crypto-policies /etc/crypto-policies \
+	--ro-bind /etc/fonts /etc/fonts \
+	--ro-bind /etc/opensc.conf /etc/opensc.conf \
+	--ro-bind /etc/pkcs11 /etc/pkcs11 \
+	--ro-bind /etc/pki /etc/pki \
+	--ro-bind /etc/resolv.conf /etc/resolv.conf \
+	--ro-bind /run/systemd/resolve/stub-resolv.conf /run/systemd/resolve/stub-resolv.conf \
+	--ro-bind /etc/selinux /etc/selinux \
+	--setenv HOME "$HOME" \
+	--setenv SHELL /sbin/nologin \
+	--bind "$HOME/.mozilla" "$HOME/.mozilla" \
+	--bind "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox/default-nightly" "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox/default-nightly" \
+	--bind "$xdg_cache/mozilla/firefox" "$xdg_cache/.mozilla/firefox" \
+	--bind "$HOME/Downloads/firefox" "$HOME/Downloads" \
+	--proc /proc --dev /dev \
+	--dev-bind /dev/dri /dev/dri \
+	--ro-bind /sys/dev/char /sys/dev/char \
+	--ro-bind /sys/devices/system /sys/devices/system \
+	--ro-bind /sys/devices/pci0000:00 /sys/devices/pci0000:00 \
+	--ro-bind /sys/devices/i915 /sys/devices/i915 \
+	--unshare-all --share-net \
+	--setenv LD_LIBRARY_PATH /usr/lib64/firefox \
+	--setenv DISPLAY "$DISPLAY" \
+	--setenv GTK_THEME "Breeze-Dark" \
+	--setenv "MOZ_ENABLE_WAYLAND" "1" \
+	--setenv WAYLAND_DISPLAY "$WAYLAND_DISPLAY" \
+	--setenv XDG_RUNTIME_DIR "$xdg_runtime" \
+	--ro-bind "/run/dbus" "/run/dbus" \
+	--ro-bind "$xdg_runtime/$WAYLAND_DISPLAY" "$xdg_runtime/$WAYLAND_DISPLAY" \
+	--hostname RESTRICTED \
+	--new-session --die-with-parent --cap-drop ALL \
+	--seccomp 9 \
+	/usr/lib64/firefox/firefox-bin "$@" \
+	9<"$xdg_data/seccomp/seccomp-filter-chromium.bpf"
+
+# vi:ft=sh

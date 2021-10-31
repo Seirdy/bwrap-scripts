@@ -1,0 +1,59 @@
+# very restricted set of allowed syscalls for using w3m offline, reading a file or from stdin.
+
+access
+arch_prctl
+brk
+clock_gettime
+clone
+close
+connect
+dup
+dup2
+execve
+exit_group
+fcntl
+futex
+getcwd
+getegid
+geteuid
+getgid
+getpgrp
+getpid
+getppid
+getrandom
+getuid
+lseek
+munmap
+newfstatat
+openat
+pipe2
+read
+readlink
+rt_sigaction
+rt_sigprocmask
+rt_sigreturn
+sched_getaffinity
+sigaltstack
+sysinfo
+uname
+write
+
+socket 0 AF_UNIX
+
+## W^X.
+# Disallow creating writable and executable mappings.
+mmap 2 PROT_NONE
+mmap 2 PROT_READ
+mmap 2 PROT_READ|PROT_EXEC
+mmap 2 PROT_READ|PROT_WRITE
+
+# Disallow transitioning mappings to executable.
+mprotect 2 PROT_NONE
+mprotect 2 PROT_READ
+mprotect 2 PROT_WRITE
+mprotect 2 PROT_READ|PROT_WRITE
+
+ioctl 1 TCGETS
+ioctl 1 TCGETS
+ioctl 1 TIOCGWINSZ
+ioctl 1 SNDCTL_TMR_START

@@ -1,0 +1,11 @@
+## Copyright (C) 2012 - 2021 ENCRYPTED SUPPORT LP <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+@include seccomp-allowed-default
+
+## Disable W^X.
+mmap
+mmap2
+mprotect
+pkey_mprotect
+shmat

@@ -1,0 +1,80 @@
+#!/usr/bin/env dash
+# A helpful comment
+
+# the name of this program
+progname="$(basename "${0}")"
+
+help_text="Usage: $progname [OPTION...] [FILE]
+
+View a file or STDIN in w3m, sandboxed with bubblewrap.
+Internet access is blocked; ideal for viewing HTML emails.
+
+Options:
+  -h, --help            Print this help and exit
+"
+
+usage() {
+	printf '%s' "$help_text"
+}
+
+# when the user passess bad args, send a msg to stderr and exit
+# usage: bad_option <option> <reason>
+bad_option() {
+	echo "$progname: option $1: $2" >&2
+	usage >&2
+	exit 1
+}
+
+args=''
+
+# parse arguments
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h | --help)
+			usage
+			exit 0
+			;;
+		-*)
+			args="$args $1"
+			;;
+		*)
+			if [ -f "$1" ]; then
+				file_path="$1"
+			else
+				args="$args $1"
+			fi
+			;;
+	esac
+	shift
+done
+
+bwrap_wrapper() {
+	env -i bwrap \
+		--ro-bind /usr/bin/zathura /usr/bin/zathura \
+		--ro-bind "${XDG_CONFIG_HOME-$HOME/.config}/zathura" "/home/user/.config/zathura" \
+		--ro-bind /usr/share/X11/xkb /usr/share/X11/xkb \
+		--ro-bind /usr/share/fontconfig /usr/share/fontconfig \
+		--ro-bind /usr/share/fonts /usr/share/fonts \
+		--ro-bind /usr/share/themes /usr/share/themes \
+		--ro-bind /usr/share/misc /usr/share/misc \
+		--setenv HOME /home/user \
+		--dir /data \
+		--ro-bind "$file_path" /data/"$(basename "$file_path")" \
+		--symlink usr/lib64 /lib64 \
+		--ro-bind /usr/lib64 /usr/lib64 \
+		--ro-bind ~/.cache/fontconfig /home/user/.cache/fontconfig \
+		--proc /proc \
+		--unshare-all \
+		--setenv WAYLAND_DISPLAY "$WAYLAND_DISPLAY" \
+		--setenv XDG_RUNTIME_DIR "/run/user/$(id -u)" \
+		--ro-bind "/run/user/$(id -u)/$WAYLAND_DISPLAY" "/run/user/$(id -u)/$WAYLAND_DISPLAY" \
+		--hostname RESTRICTED \
+		--new-session --die-with-parent --cap-drop ALL \
+		--seccomp 9 \
+		"$@" \
+		9<"${XDG_DATA_HOME-$HOME/.local/share}/seccomp/seccomp-filter-default.bpf"
+}
+
+bwrap_wrapper zathura -c /home/user/.config/zathura "/data/$(basename "$file_path")"
+
+# vi:ft=sh

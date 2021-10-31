@@ -1,0 +1,137 @@
+#!/usr/bin/env dash
+
+set -e
+
+# path to chromium installation
+# [ -z "$CHROMIUM_PATH" ] \
+# 	&& CHROMIUM_PATH="$HOME/Downloads/gitclone/chromium/out/opt/chromium.org/chromium-unstable"
+[ -z "$CHROMIUM_PATH" ] \
+	&& CHROMIUM_PATH="$GHQ_ROOT/github.com/chromium-unofficial-latest-linux/chromium-latest-linux/latest/chrome-linux"
+
+set -u
+
+# sandbox chromium and run it with prefs for better priv/sec
+# disables some google integration, bloat, and unnecessary chromium features:
+# - unused services and/or their api keys (translate, data-reduction proxy, cloud print, etc)
+# - telemetry, GAIA
+# - NTP modules
+# - experiments/trials
+# - dino easter egg
+# - first-run, default browser checks
+# - autofill
+# disables GPU accel, unnecessary filesystem access
+# disables some web features, including:
+# - WebGL, WebGPU, WebXR
+# - WebRTC
+# - Javascript JIT-compilation
+# - Preload/Prefetch
+# - web payments apis (inc all Google integration related to web payments)
+# - web speech/speech-synth
+# - notifications
+# - background networking
+# - filesystem api
+# - reading from canvas
+# enables hardening measures like HTTPS-First, DrDc, stricter isolation, etc.
+
+# there's some stuff in here that I disable that you might not want to:
+# - hwaccel video decoders: I play videos in mpv with yt-dlp.
+# - Network Time Service: I do this properly at the OS level so it'd be useless for Chromium to do it. If you don't do timesync at the OS level properly, then you should fix that or leave this feature enabled; it's important.
+# - Google Safe Browsing: I use its blocklist on the DNS level and I don't download random crap/extensions on this browser profile.
+# - Network portal: captive portal detection for if you have to sign into wi-fi. I handle this manually on a site I host by and for myself so I didn't want chromium to prompt me.
+# - Any access to the current timezone; this implicitly sets the timezone to UTC. This is good for reducing tracking but might be inconvenient if you're used to reading local time. I don't explicitly set the timezone to UTC because this serves as a useful "canary" to know if my sandbox is active.
+
+# Personal preferences I set that you might disagree with, especially if you're very concerned about fingerprinting:
+# - force prefers-color-scheme=dark
+# - overlay scrollbars
+# - set prefers-reduced-motion
+
+# you can set the enable_ and disable_ features in chrome://flags if you prefer.
+# Some of these might be outdated, but that's completely harmless; chromium silently ignores flags that no longer exist.
+enable_features_sec='ClearCrossSiteCrossBrowsingContextGroupWindowName,EnableDrDc,HttpsOnlyMode,PdfUnseasoned,SplitCacheByNetworkIsolationKey,StrictOriginIsolation,StrictExtensionIsolation,WebRtcHideLocalIpsWithMdns'
+# enable_features_sec="CrossOriginOpenerPolicyByDefault,$enable_features_sec" # breaks devtools, very experimental
+# enable_features_sec="EmbeddingRequiresOptIn,$enable_features_sec" # breaks most frames inc. the PDF viewer, very experimental
+enable_features_other='OmniboxUpdatedConnectionSecurityIndicators,OverlayScrollbar,ThrottleDisplayNoneAndVisibilityHiddenCrossOriginIframes,UseOzonePlatform,WebRTCPipeWireCapturer,ReaderMode:discoverability/offer-in-settings,IncognitoClearBrowsingDataDialogForDesktop,DisableQuickAnswersV2Translation' # i guess pipewire is better than pulse?
+enable_features="$enable_features_sec,$enable_features_other"
+
+disable_autofill='AutofillAddressProfileSavePrompt,AutofillAlwaysReturnCloudTokenizedCard,AutofillCreditCardAuthentication,AutofillCreditCardUploadFeedback,AutofillEnableMerchantBoundVirtualCards,AutofillEnableOfferNotification,AutofillEnableOfferNotificationCrossTabTracking,AutofillParseMerchantPromoCodeFields,AutofillSaveAndFillVPA,AutofillShowTypePredictions,AutofillSuggestVirtualCardsOnIncompleteForm,AutofillUpstream,SyncAutofillWalletOfferData'
+disable_pwmngr='SyncTrustedVaultPassphrasePromo,SyncTrustedVaultPassphraseRecovery,SyncTrustedVaultPassphrasePromo,SyncTrustedVaultPassphraseRecovery'
+disable_ecommerce='SecurePaymentConfirmationSyncTrustedVaultPassphrasePromo,SyncAutofillWalletOfferData,WebPaymentsExperimentalFeatures'
+disable_features_other='FontAccess,GenericSensorExtraClasses,HappinessTrackingSurveysForDesktopDemo,LensRegionSearch,LiteVideo,MediaEngagementBypassAutoplayPolicies,NavigationPredictor,NetworkTimeServiceQuerying,NtpModules,OptimizationGuideModelDownloading,PreloadMediaEngagementData,ServiceWorkerSubresourceFilter,TabHoverCardImages,WebBundles'
+disable_features="$disable_features_other,$disable_autofill,$disable_pwmngr,$disable_ecommerce"
+
+xdg_config="${XDG_CONFIG_HOME-$HOME/.config}"
+xdg_cache="${XDG_CACHE_HOME-$HOME/.cache}"
+xdg_data="${XDG_DATA_HOME-$HOME/.local/share}"
+xdg_runtime="${XDG_RUNTIME_DIR-/run/user/$(id -u)}"
+# unset all envvars with "env -i"
+# mime, icons, and glib need to be shared for save dialogs to work
+# xcb needs to be shared when launching after an update
+# /tmp/.X11-unix access allows isolating network namespace
+mkdir -p "$xdg_config/chromium" "$HOME/Downloads/chromium"
+# cll_root="$GHQ_ROOT/github.com/chromium-unofficial-latest-linux/chromium-latest-linux"
+# rev="$(readlink "$cll_root/latest")"
+# rev=898393
+# rev=898518
+env -i bwrap \
+	--dev-bind /dev/dri /dev/dri \
+	--dev-bind /dev/shm /dev/shm \
+	--symlink /usr/lib /lib \
+	--symlink /usr/lib64 /lib64 \
+	--ro-bind /tmp/.X11-unix /tmp/.X11-unix \
+	--ro-bind /etc/alternatives/libnssckbi.so.x86_64 /etc/alternatives/libnssckbi.so.x86_64 \
+	--ro-bind /etc/fonts /etc/fonts \
+	--ro-bind /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf \
+	--ro-bind /etc/selinux /etc/selinux \
+	--ro-bind /sys/dev/char /sys/dev/char \
+	--ro-bind /sys/devices/system /sys/devices/system \
+	--ro-bind /sys/devices/pci0000:00 /sys/devices/pci0000:00 \
+	--ro-bind /sys/devices/i915 /sys/devices/i915 \
+	--ro-bind /sys/bus /sys/bus \
+	--ro-bind /sys/class /sys/class \
+	--ro-bind /sys/fs/cgroup /sys/fs/cgroup \
+	--ro-bind /usr/lib64 /usr/lib64 \
+	--ro-bind /usr/share/X11/xkb /usr/share/X11/xkb \
+	--ro-bind /usr/share/applications /usr/share/applications \
+	--ro-bind /usr/share/fontconfig /usr/share/fontconfig \
+	--ro-bind /usr/share/fonts /usr/share/fonts \
+	--ro-bind /usr/share/icons /usr/share/icons \
+	--ro-bind /usr/share/glib-2.0/schemas /usr/share/glib-2.0/schemas \
+	--ro-bind /usr/share/mime /usr/share/mime \
+	--ro-bind /usr/share/pki /usr/share/pki \
+	--ro-bind "/usr/share/themes/${GTK_THEME}" "/usr/share/themes/${GTK_THEME}" \
+	--ro-bind /run/dbus /run/dbus \
+	--ro-bind "$xdg_runtime/${WAYLAND_DISPLAY-wayland-1}" "$xdg_runtime/${WAYLAND_DISPLAY-wayland-1}" \
+	--ro-bind "$CHROMIUM_PATH" "$HOME/chromium" \
+	--setenv XDG_RUNTIME_DIR "$xdg_runtime" \
+	--bind "$xdg_runtime/bus" "$xdg_runtime/bus" \
+	--bind "$xdg_runtime/dconf" "$xdg_runtime/dconf" \
+	--ro-bind "$xdg_runtime/pipewire-0" "$xdg_runtime/pipewire-0" \
+	--ro-bind "$xdg_runtime/pulse/native" "$xdg_runtime/pulse/native" \
+	--setenv HOME "$HOME" \
+	--setenv SHELL /sbin/nologin \
+	--bind "$xdg_cache/chromium" "$xdg_cache/chromium" \
+	--bind "$HOME/Downloads/chromium" "$HOME/Downloads" \
+	--bind "$xdg_config" "$HOME/.config" \
+	--setenv XCURSOR_SIZE "${XCURSOR_SIZE-24}" \
+	--setenv DISPLAY "$DISPLAY" \
+	--setenv GTK_THEME "${GTK_THEME-Adwaita:dark}" \
+	--setenv WAYLAND_DISPLAY "${WAYLAND_DISPLAY-wayland-1}" \
+	--proc /proc --dev /dev \
+	--ro-bind /proc/cpuinfo /proc/cpuinfo \
+	--unshare-all --share-net --hostname RESTRICTED \
+	--new-session --die-with-parent --cap-drop ALL \
+	--seccomp 9 \
+	"$HOME/chromium/chrome" \
+	--enable-features="$enable_features" \
+	--disable-features="$disable_features" \
+	--ozone-platform=wayland --js-flags='--jitless' --enable-potentially-annoying-security-features --enable-strict-mixed-content-checking --enable-strict-powerful-feature-restrictions --site-per-process --disable-gpu --disable-remote-fonts \
+	--disable-3d-apis --disable-accelerated-2d-canvas --disable-accelerated-video-decode --disable-file-system --disable-notifications --disable-speech --disable-speech-api --disable-reading-from-canvas --disable-background-networking --disable-auto-reload --disable-media-session-api --disable-webgl --disable-webgl2 --disable-webrtc-hw-encoding --disable-webrtc-hw-decoding \
+	--no-pings --no-crash-upload --no-report-upload --no-vr-runtime --no-wifi \
+	--force-prefers-reduced-motion --force-dark-mode --disable-software-video-decoders \
+	--disable-dinosaur-easter-egg --disable-file-manager-touch-mode --no-default-browser-check --no-first-run --disable-network-portal-notification \
+	--disable-client-side-phishing-detection --disable-client-side-phishing-protection --disable-default-apps --disable-gaia-services --disable-sync --disable-sync-preferences --disable-sync-types --allow-browser-signin=false --disable-device-discovery-notifications --disable-domain-reliability --disable-fonts-googleapis-references --disable-field-trial-config --disable-translate --disable-touch-adjustment --disable-wake-on-wifi --disable-offer-upload-credit-cards --disable-breakpad --disable-crash-reporter --disable-field-trial-config --data-reduction-proxy-server-experiments-disabled --lang=en-US --disable-ntp-popular-sites --disable-offer-store-unmasked-wallet-cards --disable-office-editing-component-extension --disable-fine-grained-time-zone-detection \
+	--autofill-assistant-url='' --autofill-api-key='' --autofill-assistant-key='' --autofill-server-url='' --optimization-guide-service-api-key='' --transit-script-url='' --connectivity-check-url='' --crash-server-url='' --data-reduction-proxy-config-url='' --data-reduction-proxy-pingback-url='' --data-reduction-proxy-secure-proxy-check-url='' --gcm-checkin-url='' --gcm-mcs-endpoint='' --gcm-registration-url='' --google-doodle-url='' --override-metrics-upload-url='' --cloud-print-url='' --google-apis-url='' --google-base-url='' --google-url='' --cryptauth-http-host='' --cryptauth-v2-devicesync-http-host='' --cryptauth-v2-enrollment-http-host='' --device-management-url='' --translate-script-url='' \
+	"$@" \
+	9<"$xdg_data/seccomp/seccomp-filter-chromium.bpf"
+
+# vi:ft=sh
