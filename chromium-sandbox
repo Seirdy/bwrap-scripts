@@ -98,7 +98,7 @@ env -i bwrap \
 	--ro-bind /usr/share/glib-2.0/schemas /usr/share/glib-2.0/schemas \
 	--ro-bind /usr/share/mime /usr/share/mime \
 	--ro-bind /usr/share/pki /usr/share/pki \
-	--ro-bind "/usr/share/themes/${GTK_THEME}" "/usr/share/themes/${GTK_THEME}" \
+	--ro-bind "/usr/share/themes/${GTK_THEME-Adwaita-dark}" "/usr/share/themes/${GTK_THEME-Adwaita-dark}" \
 	--ro-bind /run/dbus /run/dbus \
 	--ro-bind "$xdg_runtime/${WAYLAND_DISPLAY-wayland-1}" "$xdg_runtime/${WAYLAND_DISPLAY-wayland-1}" \
 	--ro-bind "$CHROMIUM_PATH" "$HOME/chromium" \
