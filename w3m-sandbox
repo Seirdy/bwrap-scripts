@@ -67,12 +67,12 @@ bwrap_wrapper() {
 		--setenv TERM "$TERM" \
 		--new-session --die-with-parent --cap-drop ALL \
 		--seccomp 9 \
-		"$@" 9<"$xdg_data/seccomp/seccomp-filter-w3m.bpf"
+		"$@" 9<"$xdg_data/seccomp/seccomp-filter-default.bpf"
 
 }
 
 if [ -z "$file_path" ]; then
-	bwrap_wrapper w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args
+	bwrap_wrapper w3m -I %{charset} -T text/html -no-mouse -no-cookie -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args
 else
 	bwrap_wrapper --ro-bind "$(dirname "$file_path")" /data w3m -I %{charset} -T text/html -cols "$COLUMNS" -o display_link=true -o display_link_number=true -o display_image=false $args "/data/$(basename "$file_path")"
 fi
