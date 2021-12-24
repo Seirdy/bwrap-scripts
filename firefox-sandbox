@@ -12,12 +12,14 @@ xdg_runtime="${XDG_RUNTIME_DIR-/run/user/$(id -u)}"
 # mime, icons, and glib need to be shared for save dialogs to work
 # xcb needs to be shared when launching after an update
 # /tmp/.X11-unix access allows isolating network namespace
+# no access to pulseaudio/pipewire.
 env -i bwrap \
 	--symlink usr/lib /lib \
 	--symlink usr/lib64 /lib64 \
 	--ro-bind /tmp/.X11-unix /tmp/.X11-unix \
 	--ro-bind /usr/lib /usr/lib \
 	--ro-bind /usr/lib64 /usr/lib64 \
+	--ro-bind /opt/firefox-trunk /opt/firefox-trunk \
 	--ro-bind /usr/share/X11/xkb /usr/share/X11/xkb \
 	--ro-bind /usr/share/themes /usr/share/themes \
 	--ro-bind /usr/share/icons /usr/share/icons \
@@ -54,7 +56,7 @@ env -i bwrap \
 	--ro-bind /sys/devices/pci0000:00 /sys/devices/pci0000:00 \
 	--ro-bind /sys/devices/i915 /sys/devices/i915 \
 	--unshare-all --share-net \
-	--setenv LD_LIBRARY_PATH /usr/lib64/firefox \
+	--setenv LD_LIBRARY_PATH /opt/firefox-trunk \
 	--setenv DISPLAY "$DISPLAY" \
 	--setenv GTK_THEME "Breeze-Dark" \
 	--setenv "MOZ_ENABLE_WAYLAND" "1" \
@@ -65,7 +67,7 @@ env -i bwrap \
 	--hostname RESTRICTED \
 	--new-session --die-with-parent --cap-drop ALL \
 	--seccomp 9 \
-	/usr/lib64/firefox/firefox-bin "$@" \
-	9<"$xdg_data/seccomp/seccomp-filter-chromium.bpf"
+	/opt/firefox-trunk/firefox-bin "$@" \
+	9<"$xdg_data/seccomp/seccomp-filter-ff.bpf"
 
 # vi:ft=sh

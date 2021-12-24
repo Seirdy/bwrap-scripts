@@ -19,6 +19,7 @@ clock_getres
 clock_gettime
 clock_nanosleep
 clone
+clone3
 close
 connect
 copy_file_range
